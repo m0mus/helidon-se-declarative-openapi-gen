@@ -65,6 +65,31 @@
             <artifactId>helidon-config-yaml</artifactId>
         </dependency>
 
+        {{#hasSecurity}}
+        <!-- Security — role-based access control for @RoleValidator.Roles-annotated endpoints -->
+        <dependency>
+            <groupId>io.helidon.security</groupId>
+            <artifactId>helidon-security</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.helidon.webserver</groupId>
+            <artifactId>helidon-webserver-security</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.helidon.security.abac</groupId>
+            <artifactId>helidon-security-abac-role</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.helidon.security</groupId>
+            <artifactId>helidon-security-annotations</artifactId>
+        </dependency>
+        <!-- ABAC provider (runtime) — evaluates role requirements -->
+        <dependency>
+            <groupId>io.helidon.security.providers</groupId>
+            <artifactId>helidon-security-providers-abac</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+        {{/hasSecurity}}
         <!-- JUL logging bridge (runtime only) -->
         <dependency>
             <groupId>io.helidon.logging</groupId>

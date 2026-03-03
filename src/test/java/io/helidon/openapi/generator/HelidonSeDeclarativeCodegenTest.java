@@ -141,6 +141,44 @@ class HelidonSeDeclarativeCodegenTest {
     }
 
     // -------------------------------------------------------------------------
+    // Security role annotation value formatting
+    // -------------------------------------------------------------------------
+
+    @Test
+    void singleSecurityRole_formattedAsQuotedString() {
+        // x-roles-annotation-value for a single role: "admin"
+        // Verify via fromOperation by checking the vendor extension directly
+        io.swagger.v3.oas.models.Operation op = new io.swagger.v3.oas.models.Operation();
+        op.addSecurityItem(new io.swagger.v3.oas.models.security.SecurityRequirement()
+                .addList("basicAuth", java.util.List.of("admin")));
+        org.openapitools.codegen.CodegenOperation cop =
+                codegen.fromOperation("/items", "get", op, java.util.List.of());
+        assertThat(cop.vendorExtensions)
+                .containsEntry("x-roles-annotation-value", "\"admin\"");
+    }
+
+    @Test
+    void multipleSecurityRoles_formattedAsArray() {
+        io.swagger.v3.oas.models.Operation op = new io.swagger.v3.oas.models.Operation();
+        op.addSecurityItem(new io.swagger.v3.oas.models.security.SecurityRequirement()
+                .addList("basicAuth", java.util.List.of("admin", "moderator")));
+        org.openapitools.codegen.CodegenOperation cop =
+                codegen.fromOperation("/items", "delete", op, java.util.List.of());
+        assertThat(cop.vendorExtensions)
+                .containsEntry("x-roles-annotation-value", "{\"admin\", \"moderator\"}");
+    }
+
+    @Test
+    void noSecurity_noSecurityVendorExtensions() {
+        io.swagger.v3.oas.models.Operation op = new io.swagger.v3.oas.models.Operation();
+        org.openapitools.codegen.CodegenOperation cop =
+                codegen.fromOperation("/items", "get", op, java.util.List.of());
+        assertThat(cop.vendorExtensions)
+                .doesNotContainKey("x-has-security-roles")
+                .doesNotContainKey("x-roles-annotation-value");
+    }
+
+    // -------------------------------------------------------------------------
     // Defaults
     // -------------------------------------------------------------------------
 

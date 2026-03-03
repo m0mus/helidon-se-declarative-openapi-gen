@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.openapitools.codegen.CodegenModel;
 import org.openapitools.codegen.CodegenOperation;
@@ -318,6 +319,13 @@ public class HelidonSeDeclarativeCodegen extends AbstractJavaCodegen {
             if (!roles.isEmpty()) {
                 op.vendorExtensions.put("x-security-roles", roles);
                 op.vendorExtensions.put("x-has-security-roles", Boolean.TRUE);
+                // Pre-format as Java annotation value: single → "role", multiple → {"r1", "r2"}
+                String rolesValue = roles.size() == 1
+                        ? "\"" + roles.get(0) + "\""
+                        : "{" + roles.stream()
+                                .map(r -> "\"" + r + "\"")
+                                .collect(Collectors.joining(", ")) + "}";
+                op.vendorExtensions.put("x-roles-annotation-value", rolesValue);
             }
         }
 
@@ -348,6 +356,7 @@ public class HelidonSeDeclarativeCodegen extends AbstractJavaCodegen {
         // Per-operation: method-level sub-path and other enrichments
         boolean anyResponseHeaders = false;
         boolean anyOptionalQuery = false;
+        boolean anySecurityRoles = false;
         String errorModel = null;
 
         for (CodegenOperation op : opList) {
@@ -375,6 +384,13 @@ public class HelidonSeDeclarativeCodegen extends AbstractJavaCodegen {
             if (op.allParams.stream().anyMatch(p -> p.vendorExtensions.containsKey("x-optional"))) {
                 anyOptionalQuery = true;
             }
+            if (op.vendorExtensions.containsKey("x-has-security-roles")) {
+                anySecurityRoles = true;
+                // SecurityContext needs a leading comma when other params already appear
+                boolean needsLeadingComma = !op.allParams.isEmpty()
+                        || op.vendorExtensions.containsKey("x-has-response-headers");
+                op.vendorExtensions.put("x-needs-leading-comma-for-security", needsLeadingComma);
+            }
 
             // Find error model from non-2xx responses
             if (errorModel == null) {
@@ -389,7 +405,13 @@ public class HelidonSeDeclarativeCodegen extends AbstractJavaCodegen {
 
         result.put("hasResponseHeaders", anyResponseHeaders);
         result.put("hasOptionalQueryParams", anyOptionalQuery);
+        result.put("hasSecurityRoles", anySecurityRoles);
         result.put("errorModel", errorModel != null ? errorModel : "Object");
+        if (anySecurityRoles) {
+            // Visible to supporting-file templates (pom.xml, application.yaml) which only
+            // see additionalProperties, not the per-tag OperationsMap.
+            additionalProperties.put("hasSecurity", Boolean.TRUE);
+        }
 
         // Also expose classname in operations context for templates that need it
         String classname = toApiName(result.getOperations().get("baseName") != null

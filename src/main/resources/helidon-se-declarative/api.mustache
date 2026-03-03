@@ -17,6 +17,10 @@ import java.util.Optional;
 import io.helidon.http.HeaderNames;
 import io.helidon.webserver.http.ServerResponse;
 {{/hasResponseHeaders}}
+{{#hasSecurityRoles}}
+import io.helidon.security.SecurityContext;
+import io.helidon.security.abac.role.RoleValidator;
+{{/hasSecurityRoles}}
 
 /**
  * Declarative HTTP endpoint for the {{classname}} API.
@@ -43,7 +47,8 @@ public class {{classname}}Endpoint {
     {{/vendorExtensions.x-has-method-path}}{{#hasProduces}}@Http.Produces(MediaTypes.APPLICATION_JSON_VALUE)
     {{/hasProduces}}{{#hasConsumes}}@Http.Consumes(MediaTypes.APPLICATION_JSON_VALUE)
     {{/hasConsumes}}{{#vendorExtensions.x-status-code}}@RestServer.Status({{vendorExtensions.x-status-code}})
-    {{/vendorExtensions.x-status-code}}public {{{returnType}}} {{operationId}}({{#vendorExtensions.x-has-response-headers}}ServerResponse res{{#allParams}}, {{/allParams}}{{/vendorExtensions.x-has-response-headers}}{{#allParams}}{{#isPathParam}}@Http.PathParam("{{baseName}}") {{{dataType}}} {{paramName}}{{/isPathParam}}{{#isQueryParam}}@Http.QueryParam("{{baseName}}") {{{dataType}}} {{paramName}}{{/isQueryParam}}{{#isHeaderParam}}@Http.HeaderParam("{{baseName}}") {{{dataType}}} {{paramName}}{{/isHeaderParam}}{{#isBodyParam}}@Http.Entity {{{dataType}}} {{paramName}}{{/isBodyParam}}{{^-last}}, {{/-last}}{{/allParams}}) {
+    {{/vendorExtensions.x-status-code}}{{#vendorExtensions.x-has-security-roles}}@RoleValidator.Roles({{{vendorExtensions.x-roles-annotation-value}}})
+    {{/vendorExtensions.x-has-security-roles}}public {{{returnType}}} {{operationId}}({{#vendorExtensions.x-has-response-headers}}ServerResponse res{{#allParams}}, {{/allParams}}{{/vendorExtensions.x-has-response-headers}}{{#allParams}}{{#isPathParam}}@Http.PathParam("{{baseName}}") {{{dataType}}} {{paramName}}{{/isPathParam}}{{#isQueryParam}}@Http.QueryParam("{{baseName}}") {{{dataType}}} {{paramName}}{{/isQueryParam}}{{#isHeaderParam}}@Http.HeaderParam("{{baseName}}") {{{dataType}}} {{paramName}}{{/isHeaderParam}}{{#isBodyParam}}@Http.Entity {{{dataType}}} {{paramName}}{{/isBodyParam}}{{^-last}}, {{/-last}}{{/allParams}}{{#vendorExtensions.x-has-security-roles}}{{#vendorExtensions.x-needs-leading-comma-for-security}}, {{/vendorExtensions.x-needs-leading-comma-for-security}}SecurityContext securityContext{{/vendorExtensions.x-has-security-roles}}) {
         {{#vendorExtensions.x-has-response-headers}}
         // Set response headers if result is paginated / has header metadata.
         // Example: res.header(HeaderNames.create("{{vendorExtensions.x-response-headers.0.name}}"), "value");

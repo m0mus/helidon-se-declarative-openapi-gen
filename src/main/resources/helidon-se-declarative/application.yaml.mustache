@@ -10,19 +10,44 @@ server:
 # Access at: GET /openapi
 {{/serveOpenApi}}
 
+{{#hasSecurity}}
 # ---
-# Security configuration stub.
-# Uncomment and configure a security provider when using secured operations.
+# Security configuration — required: one or more operations use @RoleValidator.Roles.
+# Configure an authentication provider and the ABAC role provider below.
+# The ABAC provider (helidon-security-providers-abac) is already on the classpath.
+#
+# Example using HTTP Basic Auth (replace with your production provider):
 #
 # security:
 #   providers:
+#     - abac:
+#     - http-basic-auth:
+#         users:
+#           - login: "alice"
+#             password: "secret"
+#             roles: ["admin", "user"]
+#
+# Example using JWT / OIDC:
+#
+# security:
+#   providers:
+#     - abac:
+#     - jwt:
+#         atn-token:
+#           jwk-resource:
+#             resource-path: "public-jwk.json"
+{{/hasSecurity}}
+{{^hasSecurity}}
+# ---
+# Security configuration stub (no secured operations in this spec).
+# Uncomment and configure if you add security later.
+#
+# security:
+#   providers:
+#     - abac:
 #     - http-basic-auth:
 #         users:
 #           - login: "user"
 #             password: "password"
 #             roles: ["role"]
-#     # or:
-#     - jwt:
-#         atn-token:
-#           jwk-resource:
-#             resource-path: "public-jwk.json"
+{{/hasSecurity}}
