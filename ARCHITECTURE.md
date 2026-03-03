@@ -51,26 +51,36 @@ META-INF/services/org.openapitools.codegen.CodegenConfig
   → io.helidon.openapi.generator.HelidonSeDeclarativeCodegen
 ```
 
-The generator is packaged as a **fat jar** (via maven-shade-plugin) that includes
-`openapi-generator-cli`. This lets users invoke it directly without a separate CLI
-installation:
+The generator is published as a **thin jar** and consumed as a dependency of the standard
+`openapi-generator-maven-plugin`. Users add the plugin to their project's `pom.xml` and
+list the generator artifact as a plugin dependency:
 
-```bash
-java -jar helidon-se-declarative-generator-1.0-SNAPSHOT.jar generate \
-  -g helidon-se-declarative -i spec.yaml -o out/
+```xml
+<plugin>
+    <groupId>org.openapitools</groupId>
+    <artifactId>openapi-generator-maven-plugin</artifactId>
+    <version>7.11.0</version>
+    <dependencies>
+        <dependency>
+            <groupId>io.helidon.openapi</groupId>
+            <artifactId>helidon-se-declarative-generator</artifactId>
+            <version>1.0-SNAPSHOT</version>
+        </dependency>
+    </dependencies>
+    ...
+</plugin>
 ```
 
-The fat jar's `ServicesResourceTransformer` merges all `CodegenConfig` SPI files from
-every dependency, so all built-in generators (Java, Spring, etc.) remain available
-alongside the custom one.
+Maven resolves all transitive dependencies automatically. No special packaging of the
+generator itself is required.
 
 ---
 
 ## 3. Repository structure
 
 ```
-openapi-gen/                                  ← this repository (generator only)
-├── pom.xml                                   Generator build (fat jar via maven-shade)
+openapi-gen/
+├── pom.xml                                   Generator build
 ├── README.md                                 User-facing quick-start
 ├── ARCHITECTURE.md                           This document
 └── src/
@@ -86,27 +96,15 @@ openapi-gen/                                  ← this repository (generator onl
         │   ├── HelidonSeDeclarativeCodegenTest.java   Unit tests (19)
         │   └── PetstoreGenerationIT.java              Integration tests (34)
         └── resources/
-            └── petstore.yaml                  Canonical test spec
-
-../petstore/                                  ← sibling (hand-written reference)
-├── pom.xml
-├── petstore.yaml
-└── src/main/java/io/helidon/example/petstore/
-    ├── Main.java
-    ├── PetEndpoint.java
-    └── model/{Pet,ApiError}.java
+            └── petstore.yaml                  Spec used by integration tests
 ```
-
-`openapi-gen` and `petstore` are sibling directories. The petstore is the **hand-written
-reference implementation** used to validate that the generator reproduces the correct
-output — it is not part of the generator's build.
 
 ---
 
 ## 4. Data flow: spec to source files
 
 ```
-petstore.yaml
+openapi.yaml
      │
      ▼
 Swagger Parser (bundled in openapi-generator)
@@ -188,7 +186,7 @@ parent assumes a single api template and would produce `PetsEndpoint.java` for a
 ### `preprocessOpenAPI(OpenAPI openAPI)`
 
 Runs before any per-operation processing. Extracts the path component from
-`servers[0].url` (e.g. `/v1` from `http://petstore.swagger.io/v1`) and stores it as
+`servers[0].url` (e.g. `/v1` from `https://api.example.com/v1`) and stores it as
 `additionalProperties["serverBasePath"]`. This value feeds the `application.yaml.mustache`
 stub and can be used as a base path prefix.
 
@@ -315,12 +313,13 @@ to upstream during this phase would lock the generator into the upstream release
 plugin, this project can iterate freely and be contributed upstream once the API reaches
 GA stability.
 
-### Fat jar packaging
+### Thin jar distribution via the Maven plugin
 
-The generator is packaged as a single self-contained fat jar (~29 MB) that includes the
-openapi-generator CLI. Users need only Java and the jar — no separate CLI installation or
-Maven dependency management. The `ServicesResourceTransformer` ensures all built-in
-generators remain available inside the fat jar alongside the custom one.
+The generator is published as a plain jar with no special packaging. Users consume it as a
+`<dependency>` inside the `openapi-generator-maven-plugin` block in their own `pom.xml`.
+Maven resolves all transitive dependencies from the repository. This follows the same
+pattern used by every other custom openapi-generator plugin and aligns with Helidon's own
+distribution approach, which does not use fat jars.
 
 ### No Helidon runtime dependency in the generator
 
@@ -356,7 +355,7 @@ the default run produces a complete, working project out of the box.
 ### The `basePath` collision
 
 `AbstractJavaCodegen.preprocessOpenAPI()` stores the full server URL (e.g.
-`http://petstore.swagger.io/v1`) under `additionalProperties["basePath"]`. When
+`https://api.example.com/v1`) under `additionalProperties["basePath"]`. When
 `DefaultGenerator` builds the Mustache context for each tag, it merges
 `additionalProperties` into the `OperationsMap`. This means any key put into
 `OperationsMap` with the name `"basePath"` is silently overwritten by the full URL
@@ -476,23 +475,24 @@ Covers:
 
 ### Integration tests — `PetstoreGenerationIT`
 
-Runs the full openapi-generator pipeline programmatically against `petstore.yaml` and
+Runs the full openapi-generator pipeline programmatically against a bundled test spec and
 asserts on the output written to a JUnit 5 `@TempDir`. Covers:
 
 - **Existence** of all 11 expected output files
-- **Content** of `PetsEndpoint.java`: Helidon annotations, `Optional<Integer>` for the
-  optional `limit` query param, `ServerResponse` injection for the `x-next` response
-  header, `@Http.PathParam` for `petId`, `List<Pet>` return type, `@RestServer.Status(201)`
-- **`PetsApi.java`** is an interface with correct `@Http.Path`
-- **`Pet.java`**: `@JsonInclude`, `@JsonProperty(required = true)` on required fields,
+- **Content** of the endpoint class: Helidon annotations, `Optional<T>` for optional
+  query params, `ServerResponse` injection when a success response declares headers,
+  `@Http.PathParam` for path parameters, correct return types, `@RestServer.Status` for
+  non-200 success codes
+- **API interface**: is an interface with the correct `@Http.Path`
+- **Model classes**: `@JsonInclude`, `@JsonProperty(required = true)` on required fields,
   correct field types, getters/setters, no swagger imports
-- **`ApiError.java`**: correct rename from spec's `Error` schema
+- **Model name remapping**: `Error` schema → `ApiError` class
 - **`pom.xml`**: Helidon version and `helidon-webserver` dependency present
 - **`Main.java`**: `@Service.GenerateBinding` annotation present
 
 The spec path is resolved via `Paths.get(resource.toURI())` rather than
-`resource.getFile()` to avoid the Windows leading-slash bug (`/C:/...` is not a valid
-Windows path but is what `getFile()` returns).
+`resource.getFile()` to avoid the Windows leading-slash issue (`/C:/...` is not a valid
+Windows path but is what `getFile()` returns on that platform).
 
 ---
 

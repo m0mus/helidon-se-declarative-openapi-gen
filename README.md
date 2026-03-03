@@ -23,30 +23,62 @@ until the API stabilises.
 
 ## Quick start
 
-### 1. Build the generator
+### 1. Build and install the generator
 
 ```bash
 cd openapi-gen
-mvn package
+mvn install -DskipTests
 ```
 
-Produces a self-contained fat jar at
-`target/helidon-se-declarative-generator-1.0-SNAPSHOT.jar` (~29 MB).
+This installs `helidon-se-declarative-generator-1.0-SNAPSHOT.jar` into your local Maven
+repository, where the openapi-generator Maven plugin can find it as a plugin dependency.
 
-### 2. Generate a project
+### 2. Add the plugin to your project's `pom.xml`
 
-```bash
-java -jar target/helidon-se-declarative-generator-1.0-SNAPSHOT.jar generate \
-  -g helidon-se-declarative \
-  -i /path/to/your-spec.yaml \
-  -o /path/to/output-dir \
-  --additional-properties helidonVersion=4.4.0-M1
+```xml
+<plugin>
+    <groupId>org.openapitools</groupId>
+    <artifactId>openapi-generator-maven-plugin</artifactId>
+    <version>7.11.0</version>
+    <executions>
+        <execution>
+            <goals>
+                <goal>generate</goal>
+            </goals>
+            <configuration>
+                <generatorName>helidon-se-declarative</generatorName>
+                <inputSpec>${project.basedir}/src/main/resources/openapi.yaml</inputSpec>
+                <output>${project.build.directory}/generated-sources/openapi</output>
+                <configOptions>
+                    <helidonVersion>4.4.0-M1</helidonVersion>
+                    <apiPackage>com.example.api</apiPackage>
+                    <modelPackage>com.example.model</modelPackage>
+                    <invokerPackage>com.example</invokerPackage>
+                </configOptions>
+            </configuration>
+        </execution>
+    </executions>
+    <dependencies>
+        <dependency>
+            <groupId>io.helidon.openapi</groupId>
+            <artifactId>helidon-se-declarative-generator</artifactId>
+            <version>1.0-SNAPSHOT</version>
+        </dependency>
+    </dependencies>
+</plugin>
 ```
 
-### 3. Build and run the generated project
+### 3. Generate
 
 ```bash
-cd /path/to/output-dir
+mvn generate-sources
+```
+
+Source files are written to `target/generated-sources/openapi/`.
+
+### 4. Build and run the generated project
+
+```bash
 mvn package
 java -jar target/*.jar
 ```
@@ -55,7 +87,7 @@ java -jar target/*.jar
 
 ## Generator options
 
-Pass any option with `--additional-properties key=value` (repeat for multiple).
+Set options under `<configOptions>` in the plugin configuration.
 
 | Option | Default | Description |
 |--------|---------|-------------|
@@ -67,21 +99,6 @@ Pass any option with `--additional-properties key=value` (repeat for multiple).
 | `generateErrorHandler` | `true` | Emit `{Tag}Exception.java` + `{Tag}ErrorHandler.java` per tag |
 | `serveOpenApi` | `true` | Add `helidon-openapi` dependency (serves spec at `/openapi`) |
 | `serveBasePath` | *(from spec)* | Base path prefix prepended to all endpoint paths |
-
-Example — override packages and disable client generation:
-
-```bash
-java -jar target/helidon-se-declarative-generator-1.0-SNAPSHOT.jar generate \
-  -g helidon-se-declarative \
-  -i openapi.yaml \
-  -o out/ \
-  --additional-properties \
-    helidonVersion=4.4.0-M1,\
-    apiPackage=com.example.api,\
-    modelPackage=com.example.model,\
-    invokerPackage=com.example,\
-    generateClient=false
-```
 
 ---
 
@@ -122,7 +139,7 @@ Supporting files (one per project):
 |---------|-----------|
 | `get` / `post` / `put` / `delete` / `patch` | `@Http.GET` / `@Http.POST` / `@Http.PUT` / `@Http.DELETE` / `@Http.PATCH` |
 | Common path prefix of all operations in a tag | `@Http.Path("…")` on the endpoint class |
-| Per-operation remainder path (e.g. `/{petId}`) | `@Http.Path("/{petId}")` on the method |
+| Per-operation remainder path (e.g. `/{id}`) | `@Http.Path("/{id}")` on the method |
 | `produces: application/json` | `@Http.Produces(MediaTypes.APPLICATION_JSON_VALUE)` |
 | `consumes: application/json` | `@Http.Consumes(MediaTypes.APPLICATION_JSON_VALUE)` |
 | Non-200 success status (e.g. `201`) | `@RestServer.Status(201)` |
@@ -139,15 +156,14 @@ Supporting files (one per project):
 
 ### Response headers
 
-When a success response declares headers (e.g. `x-next` for pagination), the generated
-endpoint method receives an injected `ServerResponse res` parameter and includes a comment
-showing the header name to set:
+When a success response declares headers, the generated endpoint method receives an
+injected `ServerResponse res` parameter and includes a comment showing the header to set:
 
 ```java
-public List<Pet> listPets(ServerResponse res,
-                           @Http.QueryParam("limit") Optional<Integer> limit) {
+public List<Item> listItems(ServerResponse res,
+                             @Http.QueryParam("limit") Optional<Integer> limit) {
     // Example: res.header(HeaderNames.create("x-next"), "value");
-    throw new UnsupportedOperationException("listPets not yet implemented");
+    throw new UnsupportedOperationException("listItems not yet implemented");
 }
 ```
 
@@ -165,39 +181,11 @@ The schema name `Error` is automatically mapped to `ApiError` to avoid clashing 
 
 ---
 
-## Petstore example
-
-The `../petstore/` sibling directory contains the hand-written reference implementation
-this generator is designed to reproduce. Use it to validate generator output:
-
-```bash
-# Generate
-java -jar target/helidon-se-declarative-generator-1.0-SNAPSHOT.jar generate \
-  -g helidon-se-declarative \
-  -i ../petstore/petstore.yaml \
-  -o /tmp/petstore-generated \
-  --additional-properties helidonVersion=4.4.0-M1
-
-# Build the generated project
-cd /tmp/petstore-generated && mvn package
-
-# Run it
-java -jar target/*.jar
-# → Server started at: http://localhost:8080
-# → OpenAPI spec:      http://localhost:8080/openapi
-
-# Smoke test
-curl http://localhost:8080/pets
-curl http://localhost:8080/openapi
-```
-
----
-
 ## Project layout
 
 ```
 openapi-gen/
-├── pom.xml                                         Generator build (fat jar via maven-shade)
+├── pom.xml                                         Generator build
 └── src/main/
     ├── java/io/helidon/openapi/generator/
     │   └── HelidonSeDeclarativeCodegen.java         Core codegen class (extends AbstractJavaCodegen)
