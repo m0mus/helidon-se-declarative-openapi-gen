@@ -1,0 +1,37 @@
+package {{package}};
+
+import io.helidon.http.Status;
+
+/**
+ * Exception thrown by {@link {{classname}}Endpoint} to signal an API error response.
+ *
+ * <p>Caught by {@link {{classname}}ErrorHandler}, which serialises the error to JSON
+ * using the spec's error schema and sets the HTTP status on the response.</p>
+ *
+ * <p>Usage:
+ * <pre>{@code
+ *   throw new {{classname}}Exception("Pet not found: " + petId, Status.NOT_FOUND_404);
+ * }</pre>
+ * </p>
+ */
+public class {{classname}}Exception extends RuntimeException {
+
+    private final Status status;
+
+    public {{classname}}Exception(String message, Status status) {
+        super(message);
+        this.status = status;
+    }
+
+    public {{classname}}Exception(String message, Status status, Throwable cause) {
+        super(message, cause);
+        this.status = status;
+    }
+
+    /**
+     * Returns the HTTP status to send in the error response.
+     */
+    public Status status() {
+        return status;
+    }
+}

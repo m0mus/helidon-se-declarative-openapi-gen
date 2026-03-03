@@ -1,0 +1,28 @@
+server:
+  port: 8080
+  host: 0.0.0.0
+  # Uncomment to include request-scoped error details in responses (NOT for production):
+  # error-handling:
+  #   include-entity: true
+
+{{#serveOpenApi}}
+# OpenAPI endpoint is auto-discovered from META-INF/openapi.yaml on the classpath.
+# Access at: GET /openapi
+{{/serveOpenApi}}
+
+# ---
+# Security configuration stub.
+# Uncomment and configure a security provider when using secured operations.
+#
+# security:
+#   providers:
+#     - http-basic-auth:
+#         users:
+#           - login: "user"
+#             password: "password"
+#             roles: ["role"]
+#     # or:
+#     - jwt:
+#         atn-token:
+#           jwk-resource:
+#             resource-path: "public-jwk.json"

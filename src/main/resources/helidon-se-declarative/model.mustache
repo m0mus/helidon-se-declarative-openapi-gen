@@ -1,0 +1,38 @@
+{{#models}}
+package {{modelPackage}};
+
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
+{{#imports}}
+import {{import}};
+{{/imports}}
+{{#model}}
+
+/**
+ * {{description}}{{^description}}{{classname}} model.{{/description}}
+ */
+@JsonInclude(JsonInclude.Include.NON_NULL)
+public class {{classname}} {
+
+{{#vars}}
+    {{#vendorExtensions.x-json-required}}@JsonProperty(required = true)
+    {{/vendorExtensions.x-json-required}}private {{{datatypeWithEnum}}} {{name}};
+
+{{/vars}}
+    /** No-arg constructor required by Jackson. */
+    public {{classname}}() {
+    }
+
+{{#vars}}
+    public {{{datatypeWithEnum}}} {{getter}}() {
+        return {{name}};
+    }
+
+    public void {{setter}}({{{datatypeWithEnum}}} {{name}}) {
+        this.{{name}} = {{name}};
+    }
+
+{{/vars}}
+}
+{{/model}}
+{{/models}}

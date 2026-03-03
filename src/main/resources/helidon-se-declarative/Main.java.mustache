@@ -1,0 +1,44 @@
+package {{invokerPackage}};
+
+import io.helidon.logging.common.LogConfig;
+import io.helidon.service.registry.Service;
+import io.helidon.service.registry.ServiceRegistryManager;
+import io.helidon.service.registry.Services;
+import io.helidon.webserver.WebServer;
+
+/**
+ * Application entry point.
+ *
+ * <p>{@code @Service.GenerateBinding} triggers the {@code helidon-service-maven-plugin}
+ * to generate {@code ApplicationBinding.java} at build time. The binding wires all
+ * discovered services (endpoints, media modules, OpenAPI, …) without classpath scanning
+ * or reflection at runtime.</p>
+ *
+ * <p>Run the server:
+ * <pre>{@code
+ *   mvn package
+ *   java -jar target/{{artifactId}}-{{artifactVersion}}.jar
+ * }</pre>
+ * </p>
+ */
+@Service.GenerateBinding
+public final class Main {
+
+    static {
+        // Initialises logging configuration used during GraalVM native-image build.
+        LogConfig.initClass();
+    }
+
+    private Main() {
+    }
+
+    public static void main(String[] args) {
+        LogConfig.configureRuntime();
+
+        ServiceRegistryManager.start(ApplicationBinding.create());
+
+        WebServer webServer = Services.get(WebServer.class);
+        System.out.println("Server started at: http://localhost:" + webServer.port());
+        {{#serveOpenApi}}System.out.println("OpenAPI spec:      http://localhost:" + webServer.port() + "/openapi");{{/serveOpenApi}}
+    }
+}
