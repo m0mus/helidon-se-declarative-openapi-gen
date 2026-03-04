@@ -67,6 +67,14 @@
         </dependency>
         {{/corsEnabled}}
 
+        {{#ftEnabled}}
+        <!-- Fault tolerance — @Ft.Retry on generated REST client interfaces -->
+        <dependency>
+            <groupId>io.helidon.fault-tolerance</groupId>
+            <artifactId>helidon-fault-tolerance</artifactId>
+        </dependency>
+        {{/ftEnabled}}
+
         {{#serveOpenApi}}
         <!-- OpenAPI — serves spec at /openapi from META-INF/openapi.yaml -->
         <dependency>

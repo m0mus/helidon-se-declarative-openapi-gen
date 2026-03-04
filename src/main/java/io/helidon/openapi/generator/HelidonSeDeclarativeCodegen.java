@@ -54,6 +54,7 @@ public class HelidonSeDeclarativeCodegen extends AbstractJavaCodegen {
     static final String OPT_SERVE_OPENAPI = "serveOpenApi";
     static final String OPT_SERVE_BASE_PATH = "serveBasePath";
     static final String OPT_CORS_ENABLED = "corsEnabled";
+    static final String OPT_FT_ENABLED = "ftEnabled";
 
     private String helidonVersion = "4.4.0-M2";
     private boolean generateClient = true;
@@ -61,6 +62,7 @@ public class HelidonSeDeclarativeCodegen extends AbstractJavaCodegen {
     private boolean serveOpenApi = true;
     private String serveBasePath = "";
     private boolean corsEnabled = false;
+    private boolean ftEnabled = false;
 
     public HelidonSeDeclarativeCodegen() {
         super();
@@ -118,6 +120,9 @@ public class HelidonSeDeclarativeCodegen extends AbstractJavaCodegen {
         addOption(OPT_CORS_ENABLED,
                 "Add @Cors.Defaults to every endpoint class (enables CORS via application.yaml configuration)",
                 String.valueOf(corsEnabled));
+        addOption(OPT_FT_ENABLED,
+                "Add @Ft.Retry to every generated REST client interface (enables automatic retries)",
+                String.valueOf(ftEnabled));
     }
 
     // -------------------------------------------------------------------------
@@ -169,6 +174,10 @@ public class HelidonSeDeclarativeCodegen extends AbstractJavaCodegen {
             corsEnabled = Boolean.parseBoolean(
                     additionalProperties.get(OPT_CORS_ENABLED).toString());
         }
+        if (additionalProperties.containsKey(OPT_FT_ENABLED)) {
+            ftEnabled = Boolean.parseBoolean(
+                    additionalProperties.get(OPT_FT_ENABLED).toString());
+        }
 
         // Expose options to all templates via additionalProperties
         additionalProperties.put("helidonVersion", helidonVersion);
@@ -177,6 +186,7 @@ public class HelidonSeDeclarativeCodegen extends AbstractJavaCodegen {
         additionalProperties.put("serveOpenApi", serveOpenApi);
         additionalProperties.put("serveBasePath", serveBasePath);
         additionalProperties.put("corsEnabled", corsEnabled);
+        additionalProperties.put("ftEnabled", ftEnabled);
 
         // Conditionally add per-tag template files
         if (generateClient) {

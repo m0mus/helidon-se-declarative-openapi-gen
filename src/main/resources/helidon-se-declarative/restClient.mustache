@@ -3,6 +3,9 @@ package {{package}};
 // TODO: verify the exact import for @RestClient.Endpoint in your Helidon version.
 // In Helidon 4.4.x the annotation lives in io.helidon.webclient.api or a sub-package.
 // import io.helidon.webclient.api.RestClient;
+{{#ftEnabled}}
+import io.helidon.faulttolerance.Ft;
+{{/ftEnabled}}
 
 {{#operations}}
 /**
@@ -29,7 +32,8 @@ package {{package}};
  */
 // Uncomment after adding helidon-webclient-http1 dependency and verifying import path:
 // @RestClient.Endpoint("${" + "{{classnameLowercase}}-service.uri:http://localhost:8080}")
-public interface {{classname}}Client extends {{classname}}Api {
+{{#ftEnabled}}@Ft.Retry
+{{/ftEnabled}}public interface {{classname}}Client extends {{classname}}Api {
     // No additional methods — inherits the full API contract from {{classname}}Api
 }
 {{/operations}}
