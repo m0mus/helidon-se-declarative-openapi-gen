@@ -2,8 +2,7 @@ package {{package}};
 
 import io.helidon.service.registry.Service;
 import io.helidon.webserver.http.ErrorHandler;
-import io.helidon.webserver.http.ServerRequest;
-import io.helidon.webserver.http.ServerResponse;
+import io.helidon.webserver.http.spi.ErrorHandlerProvider;
 {{#operations}}
 import {{package}}.{{classname}}Exception;
 {{/operations}}
@@ -13,25 +12,30 @@ import {{package}}.{{classname}}Exception;
  *
  * <p>Discovered automatically via the service registry ({@code @Service.Singleton}).
  * Serialises the error as JSON using the spec's error schema and sets the HTTP status.</p>
+ *
+ * @deprecated {@link ErrorHandlerProvider} is an incubating Helidon API that may change.
  */
 {{#operations}}
+@Deprecated
 @Service.Singleton
-public class {{classname}}ErrorHandler implements ErrorHandler<{{classname}}Exception> {
+public class {{classname}}ErrorHandler implements ErrorHandlerProvider<{{classname}}Exception> {
 
     @Override
-    public Class<{{classname}}Exception> exceptionType() {
+    public Class<{{classname}}Exception> errorType() {
         return {{classname}}Exception.class;
     }
 
     @Override
-    public void handle(ServerRequest req, ServerResponse res, {{classname}}Exception ex) {
-        res.status(ex.status());
-        // Serialise using the error model from the spec ({{errorModel}})
-        // Replace the map literal below with: res.send(new {{errorModel}}(ex.status().code(), ex.getMessage()));
-        res.send(java.util.Map.of(
-                "code", ex.status().code(),
-                "message", ex.getMessage()
-        ));
+    public ErrorHandler<{{classname}}Exception> create() {
+        return (req, res, ex) -> {
+            res.status(ex.status());
+            // Serialise using the error model from the spec ({{errorModel}})
+            // Replace the map literal below with: res.send(new {{errorModel}}(ex.status().code(), ex.getMessage()));
+            res.send(java.util.Map.of(
+                    "code", ex.status().code(),
+                    "message", ex.getMessage()
+            ));
+        };
     }
 }
 {{/operations}}

@@ -39,7 +39,7 @@ class PetstoreGenerationIT {
                 .setGeneratorName("helidon-se-declarative")
                 .setInputSpec(specPath)
                 .setOutputDir(outputDir.toString())
-                .addAdditionalProperty("helidonVersion", "4.4.0-M1")
+                .addAdditionalProperty("helidonVersion", "4.4.0-M2")
                 .addAdditionalProperty("apiPackage", "io.helidon.example.api")
                 .addAdditionalProperty("modelPackage", "io.helidon.example.model")
                 .addAdditionalProperty("invokerPackage", "io.helidon.example");
@@ -200,16 +200,16 @@ class PetstoreGenerationIT {
     }
 
     @Test
-    void petModel_hasJsonIncludeAnnotation() throws IOException {
+    void petModel_hasJsonEntityAnnotation() throws IOException {
         assertThat(read(modelFile("Pet.java")))
-                .contains("@JsonInclude(JsonInclude.Include.NON_NULL)");
+                .contains("@Json.Entity");
     }
 
     @Test
-    void petModel_requiredFields_haveJsonPropertyRequired() throws IOException {
+    void petModel_requiredFields_haveJsonRequired() throws IOException {
         String content = read(modelFile("Pet.java"));
         // id and name are required in petstore.yaml
-        assertThat(content).contains("@JsonProperty(required = true)");
+        assertThat(content).contains("@Json.Required");
     }
 
     @Test
@@ -265,13 +265,19 @@ class PetstoreGenerationIT {
     @Test
     void pomXml_containsHelidonVersion() throws IOException {
         assertThat(read(outputDir.resolve("pom.xml").toFile()))
-                .contains("4.4.0-M1");
+                .contains("4.4.0-M2");
     }
 
     @Test
     void pomXml_containsHelidonWebserver() throws IOException {
         assertThat(read(outputDir.resolve("pom.xml").toFile()))
                 .contains("helidon-webserver");
+    }
+
+    @Test
+    void pomXml_containsJsonBindingDependency() throws IOException {
+        assertThat(read(outputDir.resolve("pom.xml").toFile()))
+                .contains("helidon-http-media-json-binding");
     }
 
     // -------------------------------------------------------------------------

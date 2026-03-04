@@ -42,7 +42,7 @@ import static org.openapitools.codegen.utils.StringUtils.camelize;
  *   <li>{Tag}Exception.java — RuntimeException subclass (if generateErrorHandler=true)</li>
  *   <li>{Tag}ErrorHandler.java — ErrorHandlerProvider (if generateErrorHandler=true)</li>
  * </ul>
- * Plus per model: {Model}.java (Jackson POJO)
+ * Plus per model: {Model}.java (Helidon build-time JSON binding POJO)
  * Plus supporting files: pom.xml, Main.java, application.yaml, logging.properties
  * </p>
  */
@@ -54,7 +54,7 @@ public class HelidonSeDeclarativeCodegen extends AbstractJavaCodegen {
     static final String OPT_SERVE_OPENAPI = "serveOpenApi";
     static final String OPT_SERVE_BASE_PATH = "serveBasePath";
 
-    private String helidonVersion = "4.4.0-M1";
+    private String helidonVersion = "4.4.0-M2";
     private boolean generateClient = true;
     private boolean generateErrorHandler = true;
     private boolean serveOpenApi = true;
@@ -257,6 +257,8 @@ public class HelidonSeDeclarativeCodegen extends AbstractJavaCodegen {
         model.imports.remove("ApiModel");
         model.imports.remove("ApiModelProperty");
         model.imports.remove("Schema");   // also remove OpenAPI 3 schema annotation shorthand
+        model.imports.remove("JsonInclude");
+        model.imports.remove("JsonProperty");
         return model;
     }
 
@@ -469,7 +471,7 @@ public class HelidonSeDeclarativeCodegen extends AbstractJavaCodegen {
                 modelsMap.getModels().forEach(modelContainer -> {
                     var model = modelContainer.getModel();
 
-                    // Mark required properties for @JsonProperty(required = true)
+                    // Mark required properties for @Json.Required
                     for (CodegenProperty prop : model.vars) {
                         if (prop.required) {
                             prop.vendorExtensions.put("x-json-required", Boolean.TRUE);

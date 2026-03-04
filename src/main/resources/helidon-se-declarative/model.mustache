@@ -1,8 +1,7 @@
 {{#models}}
 package {{modelPackage}};
 
-import com.fasterxml.jackson.annotation.JsonInclude;
-import com.fasterxml.jackson.annotation.JsonProperty;
+import io.helidon.json.binding.Json;
 {{#imports}}
 import {{import}};
 {{/imports}}
@@ -11,15 +10,15 @@ import {{import}};
 /**
  * {{description}}{{^description}}{{classname}} model.{{/description}}
  */
-@JsonInclude(JsonInclude.Include.NON_NULL)
+@Json.Entity
 public class {{classname}} {
 
 {{#vars}}
-    {{#vendorExtensions.x-json-required}}@JsonProperty(required = true)
+    {{#vendorExtensions.x-json-required}}@Json.Required
     {{/vendorExtensions.x-json-required}}private {{{datatypeWithEnum}}} {{name}};
 
 {{/vars}}
-    /** No-arg constructor required by Jackson. */
+    /** No-arg constructor. */
     public {{classname}}() {
     }
 
