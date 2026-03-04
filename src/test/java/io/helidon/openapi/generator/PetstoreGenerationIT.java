@@ -155,10 +155,11 @@ class PetstoreGenerationIT {
     }
 
     @Test
-    void endpoint_listPets_hasServerResponseForHeader() throws IOException {
-        // listPets has x-next response header → ServerResponse injected
+    void endpoint_listPets_hasComputedHeaderAnnotation() throws IOException {
+        // listPets has x-next response header → @RestServer.ComputedHeader annotation
         String content = read(apiFile("PetsEndpoint.java"));
-        assertThat(content).contains("ServerResponse");
+        assertThat(content).contains("@RestServer.ComputedHeader(name = \"x-next\"");
+        assertThat(content).doesNotContain("ServerResponse");
     }
 
     @Test
