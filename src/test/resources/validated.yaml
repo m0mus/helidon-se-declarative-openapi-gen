@@ -1,0 +1,50 @@
+openapi: "3.0.0"
+info:
+  title: Validated Items API
+  version: "1.0"
+servers:
+  - url: http://example.com/v1
+paths:
+  /items:
+    get:
+      summary: List items
+      operationId: listItems
+      tags:
+        - items
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Item'
+components:
+  schemas:
+    Item:
+      type: object
+      required:
+        - name
+        - quantity
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          pattern: "[A-Za-z0-9 ]+"
+        quantity:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 1000
+        price:
+          type: number
+          format: double
+          minimum: 0.01
+        tags:
+          type: array
+          items:
+            type: string
+          minItems: 1
+          maxItems: 20

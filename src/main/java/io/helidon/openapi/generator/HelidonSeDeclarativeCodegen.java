@@ -75,6 +75,7 @@ public class HelidonSeDeclarativeCodegen extends AbstractJavaCodegen {
         // Default model name mapping: "Error" clashes with java.lang.Error
         modelNameMapping.put("Error", "ApiError");
 
+
         // Clear doc/test templates inherited from AbstractJavaCodegen — not generated
         modelDocTemplateFiles.clear();
         apiDocTemplateFiles.clear();
@@ -461,25 +462,120 @@ public class HelidonSeDeclarativeCodegen extends AbstractJavaCodegen {
     }
 
     // -------------------------------------------------------------------------
-    // Per-model post-processing: mark required properties for @JsonProperty
+    // Per-model post-processing: mark required properties and validation constraints
     // -------------------------------------------------------------------------
 
     @Override
     public Map<String, ModelsMap> postProcessAllModels(Map<String, ModelsMap> objs) {
         Map<String, ModelsMap> result = super.postProcessAllModels(objs);
-        result.forEach((name, modelsMap) ->
-                modelsMap.getModels().forEach(modelContainer -> {
-                    var model = modelContainer.getModel();
+        boolean anyValidation = false;
+        for (Map.Entry<String, ModelsMap> entry : result.entrySet()) {
+            ModelsMap modelsMap = entry.getValue();
+            for (ModelMap modelContainer : modelsMap.getModels()) {
+                var model = modelContainer.getModel();
+                boolean modelHasValidation = false;
 
+                for (CodegenProperty prop : model.vars) {
                     // Mark required properties for @Json.Required
-                    for (CodegenProperty prop : model.vars) {
-                        if (prop.required) {
-                            prop.vendorExtensions.put("x-json-required", Boolean.TRUE);
-                        }
+                    if (prop.required) {
+                        prop.vendorExtensions.put("x-json-required", Boolean.TRUE);
                     }
 
-                    // Swagger annotation imports are already excluded via fromModel() override.
-                }));
+                    // Build @Validation.* annotations from OpenAPI constraints
+                    List<Map<String, Object>> validationAnnotations = buildValidationAnnotations(prop);
+                    if (!validationAnnotations.isEmpty()) {
+                        prop.vendorExtensions.put("x-validation-annotations", validationAnnotations);
+                        modelHasValidation = true;
+                    }
+                }
+
+                if (modelHasValidation) {
+                    model.vendorExtensions.put("x-has-validations", Boolean.TRUE);
+                    // The modelsMap-level "imports" list is already resolved to FQNs before
+                    // postProcessAllModels() runs — add directly to it so the template picks it up.
+                    @SuppressWarnings("unchecked")
+                    List<Map<String, String>> importsList =
+                            (List<Map<String, String>>) modelsMap.get("imports");
+                    if (importsList != null) {
+                        importsList.add(new HashMap<>(Map.of("import", "io.helidon.validation.Validation")));
+                    }
+                    anyValidation = true;
+                }
+            }
+        }
+        if (anyValidation) {
+            additionalProperties.put("hasValidation", Boolean.TRUE);
+        }
+        return result;
+    }
+
+    /**
+     * Maps OpenAPI schema constraints on a property to Helidon {@code @Validation.*} annotations.
+     */
+    private List<Map<String, Object>> buildValidationAnnotations(CodegenProperty prop) {
+        List<Map<String, Object>> result = new ArrayList<>();
+
+        if (prop.isString) {
+            // minLength / maxLength → @Validation.String.Length
+            if (prop.minLength != null || prop.maxLength != null) {
+                List<String> attrs = new ArrayList<>();
+                if (prop.minLength != null) attrs.add("min = " + prop.minLength);
+                if (prop.maxLength != null) attrs.add("value = " + prop.maxLength);
+                result.add(Map.of("annotation",
+                        "@Validation.String.Length(" + String.join(", ", attrs) + ")"));
+            }
+            // pattern → @Validation.String.Pattern
+            if (prop.pattern != null && !prop.pattern.isEmpty()) {
+                String escaped = prop.pattern.replace("\\", "\\\\").replace("\"", "\\\"");
+                result.add(Map.of("annotation", "@Validation.String.Pattern(\"" + escaped + "\")"));
+            }
+        } else if (prop.isInteger) {
+            // minimum / maximum → @Validation.Integer.Min / Max
+            if (prop.minimum != null) {
+                try {
+                    result.add(Map.of("annotation",
+                            "@Validation.Integer.Min(" + (int) Double.parseDouble(prop.minimum) + ")"));
+                } catch (NumberFormatException ignored) { }
+            }
+            if (prop.maximum != null) {
+                try {
+                    result.add(Map.of("annotation",
+                            "@Validation.Integer.Max(" + (int) Double.parseDouble(prop.maximum) + ")"));
+                } catch (NumberFormatException ignored) { }
+            }
+        } else if (prop.isLong) {
+            // minimum / maximum → @Validation.Long.Min / Max
+            if (prop.minimum != null) {
+                try {
+                    result.add(Map.of("annotation",
+                            "@Validation.Long.Min(" + (long) Double.parseDouble(prop.minimum) + "L)"));
+                } catch (NumberFormatException ignored) { }
+            }
+            if (prop.maximum != null) {
+                try {
+                    result.add(Map.of("annotation",
+                            "@Validation.Long.Max(" + (long) Double.parseDouble(prop.maximum) + "L)"));
+                } catch (NumberFormatException ignored) { }
+            }
+        } else if (prop.isNumber || prop.isFloat || prop.isDouble) {
+            // minimum / maximum → @Validation.Number.Min / Max (string-valued)
+            if (prop.minimum != null) {
+                result.add(Map.of("annotation", "@Validation.Number.Min(\"" + prop.minimum + "\")"));
+            }
+            if (prop.maximum != null) {
+                result.add(Map.of("annotation", "@Validation.Number.Max(\"" + prop.maximum + "\")"));
+            }
+        }
+
+        // minItems / maxItems → @Validation.Collection.Size (independent of element type)
+        if (prop.isArray && (prop.minItems != null || prop.maxItems != null)) {
+            List<String> attrs = new ArrayList<>();
+            if (prop.minItems != null) attrs.add("min = " + prop.minItems);
+            if (prop.maxItems != null) attrs.add("value = " + prop.maxItems);
+            result.add(Map.of("annotation",
+                    "@Validation.Collection.Size(" + String.join(", ", attrs) + ")"));
+        }
+
         return result;
     }
 }

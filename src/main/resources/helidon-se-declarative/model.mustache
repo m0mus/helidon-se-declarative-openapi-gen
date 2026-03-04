@@ -11,10 +11,12 @@ import {{import}};
  * {{description}}{{^description}}{{classname}} model.{{/description}}
  */
 @Json.Entity
-public class {{classname}} {
+{{#vendorExtensions.x-has-validations}}@Validation.Validated
+{{/vendorExtensions.x-has-validations}}public class {{classname}} {
 
 {{#vars}}
-    {{#vendorExtensions.x-json-required}}@Json.Required
+    {{#vendorExtensions.x-validation-annotations}}{{{annotation}}}
+    {{/vendorExtensions.x-validation-annotations}}{{#vendorExtensions.x-json-required}}@Json.Required
     {{/vendorExtensions.x-json-required}}private {{{datatypeWithEnum}}} {{name}};
 
 {{/vars}}
