@@ -53,12 +53,14 @@ public class HelidonSeDeclarativeCodegen extends AbstractJavaCodegen {
     static final String OPT_GENERATE_ERROR_HANDLER = "generateErrorHandler";
     static final String OPT_SERVE_OPENAPI = "serveOpenApi";
     static final String OPT_SERVE_BASE_PATH = "serveBasePath";
+    static final String OPT_CORS_ENABLED = "corsEnabled";
 
     private String helidonVersion = "4.4.0-M2";
     private boolean generateClient = true;
     private boolean generateErrorHandler = true;
     private boolean serveOpenApi = true;
     private String serveBasePath = "";
+    private boolean corsEnabled = false;
 
     public HelidonSeDeclarativeCodegen() {
         super();
@@ -113,6 +115,9 @@ public class HelidonSeDeclarativeCodegen extends AbstractJavaCodegen {
         addOption(OPT_SERVE_BASE_PATH,
                 "Base path prefix to add in front of all endpoint paths (e.g. /v1)",
                 serveBasePath);
+        addOption(OPT_CORS_ENABLED,
+                "Add @Cors.Defaults to every endpoint class (enables CORS via application.yaml configuration)",
+                String.valueOf(corsEnabled));
     }
 
     // -------------------------------------------------------------------------
@@ -160,6 +165,10 @@ public class HelidonSeDeclarativeCodegen extends AbstractJavaCodegen {
         if (additionalProperties.containsKey(OPT_SERVE_BASE_PATH)) {
             serveBasePath = additionalProperties.get(OPT_SERVE_BASE_PATH).toString();
         }
+        if (additionalProperties.containsKey(OPT_CORS_ENABLED)) {
+            corsEnabled = Boolean.parseBoolean(
+                    additionalProperties.get(OPT_CORS_ENABLED).toString());
+        }
 
         // Expose options to all templates via additionalProperties
         additionalProperties.put("helidonVersion", helidonVersion);
@@ -167,6 +176,7 @@ public class HelidonSeDeclarativeCodegen extends AbstractJavaCodegen {
         additionalProperties.put("generateErrorHandler", generateErrorHandler);
         additionalProperties.put("serveOpenApi", serveOpenApi);
         additionalProperties.put("serveBasePath", serveBasePath);
+        additionalProperties.put("corsEnabled", corsEnabled);
 
         // Conditionally add per-tag template files
         if (generateClient) {
@@ -295,18 +305,38 @@ public class HelidonSeDeclarativeCodegen extends AbstractJavaCodegen {
                     if (statusCode > 200 && statusCode < 300) {
                         op.vendorExtensions.put("x-status-code", statusCode);
                     }
-                    // Response headers on 2xx → need ServerResponse injection
+                    // Response headers on 2xx → @RestServer.Header (static) or @RestServer.ComputedHeader (dynamic)
                     if (statusCode >= 200 && statusCode < 300
                             && response.getHeaders() != null
                             && !response.getHeaders().isEmpty()) {
-                        op.vendorExtensions.put("x-has-response-headers", Boolean.TRUE);
-                        List<Map<String, String>> headerList = new ArrayList<>();
+                        List<Map<String, String>> staticHeaders = new ArrayList<>();
+                        List<Map<String, String>> computedHeaders = new ArrayList<>();
                         response.getHeaders().forEach((headerName, header) -> {
-                            Map<String, String> h = new HashMap<>();
-                            h.put("name", headerName);
-                            headerList.add(h);
+                            Object defaultVal = header.getSchema() != null
+                                    ? header.getSchema().getDefault() : null;
+                            if (defaultVal != null) {
+                                Map<String, String> h = new HashMap<>();
+                                h.put("name", headerName);
+                                h.put("value", defaultVal.toString());
+                                staticHeaders.add(h);
+                            } else {
+                                Map<String, String> h = new HashMap<>();
+                                h.put("name", headerName);
+                                h.put("functionName", headerNameToFunctionName(headerName));
+                                computedHeaders.add(h);
+                            }
                         });
-                        op.vendorExtensions.put("x-response-headers", headerList);
+                        if (!staticHeaders.isEmpty()) {
+                            op.vendorExtensions.put("x-has-static-headers", Boolean.TRUE);
+                            op.vendorExtensions.put("x-static-headers", staticHeaders);
+                        }
+                        if (!computedHeaders.isEmpty()) {
+                            op.vendorExtensions.put("x-has-computed-headers", Boolean.TRUE);
+                            op.vendorExtensions.put("x-computed-headers", computedHeaders);
+                        }
+                        if (!staticHeaders.isEmpty() || !computedHeaders.isEmpty()) {
+                            op.vendorExtensions.put("x-has-response-headers", Boolean.TRUE);
+                        }
                     }
                 } catch (NumberFormatException ignored) {
                     // Non-numeric code — skip
@@ -357,7 +387,7 @@ public class HelidonSeDeclarativeCodegen extends AbstractJavaCodegen {
         result.put("helidonBasePath", commonPath);
 
         // Per-operation: method-level sub-path and other enrichments
-        boolean anyResponseHeaders = false;
+        boolean anyComputedHeaders = false;
         boolean anyOptionalQuery = false;
         boolean anySecurityRoles = false;
         String errorModel = null;
@@ -381,8 +411,8 @@ public class HelidonSeDeclarativeCodegen extends AbstractJavaCodegen {
             op.vendorExtensions.put("x-is-void", "void".equals(op.returnType));
 
             // Accumulate flags
-            if (op.vendorExtensions.containsKey("x-has-response-headers")) {
-                anyResponseHeaders = true;
+            if (op.vendorExtensions.containsKey("x-has-computed-headers")) {
+                anyComputedHeaders = true;
             }
             if (op.allParams.stream().anyMatch(p -> p.vendorExtensions.containsKey("x-optional"))) {
                 anyOptionalQuery = true;
@@ -390,8 +420,7 @@ public class HelidonSeDeclarativeCodegen extends AbstractJavaCodegen {
             if (op.vendorExtensions.containsKey("x-has-security-roles")) {
                 anySecurityRoles = true;
                 // SecurityContext needs a leading comma when other params already appear
-                boolean needsLeadingComma = !op.allParams.isEmpty()
-                        || op.vendorExtensions.containsKey("x-has-response-headers");
+                boolean needsLeadingComma = !op.allParams.isEmpty();
                 op.vendorExtensions.put("x-needs-leading-comma-for-security", needsLeadingComma);
             }
 
@@ -406,7 +435,7 @@ public class HelidonSeDeclarativeCodegen extends AbstractJavaCodegen {
             }
         }
 
-        result.put("hasResponseHeaders", anyResponseHeaders);
+        result.put("hasComputedHeaders", anyComputedHeaders);
         result.put("hasOptionalQueryParams", anyOptionalQuery);
         result.put("hasSecurityRoles", anySecurityRoles);
         result.put("errorModel", errorModel != null ? errorModel : "Object");
@@ -507,6 +536,23 @@ public class HelidonSeDeclarativeCodegen extends AbstractJavaCodegen {
             additionalProperties.put("hasValidation", Boolean.TRUE);
         }
         return result;
+    }
+
+    /**
+     * Converts a response header name to a camelCase {@code @RestServer.ComputedHeader} function name.
+     * e.g. {@code "x-next"} → {@code "xNextHeaderFn"}, {@code "Cache-Control"} → {@code "cacheControlHeaderFn"}.
+     */
+    private String headerNameToFunctionName(String headerName) {
+        String[] parts = headerName.split("-");
+        StringBuilder sb = new StringBuilder(parts[0].toLowerCase());
+        for (int i = 1; i < parts.length; i++) {
+            if (!parts[i].isEmpty()) {
+                sb.append(Character.toUpperCase(parts[i].charAt(0)));
+                if (parts[i].length() > 1) sb.append(parts[i].substring(1).toLowerCase());
+            }
+        }
+        sb.append("HeaderFn");
+        return sb.toString();
     }
 
     /**

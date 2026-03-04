@@ -6,6 +6,9 @@ import io.helidon.http.HttpException;
 import io.helidon.http.Status;
 import io.helidon.service.registry.Service;
 import io.helidon.webserver.http.RestServer;
+{{#corsEnabled}}
+import io.helidon.webserver.cors.Cors;
+{{/corsEnabled}}
 {{#imports}}
 import {{import}};
 {{/imports}}
@@ -32,7 +35,8 @@ import io.helidon.security.abac.role.RoleValidator;
 @RestServer.Endpoint
 @Service.Singleton
 @Http.Path("{{helidonBasePath}}")
-public class {{classname}}Endpoint {
+{{#corsEnabled}}@Cors.Defaults
+{{/corsEnabled}}public class {{classname}}Endpoint {
 
 {{#operation}}
     // -------------------------------------------------------------------------

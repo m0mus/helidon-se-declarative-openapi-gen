@@ -59,6 +59,14 @@
         </dependency>
         {{/hasValidation}}
 
+        {{#corsEnabled}}
+        <!-- CORS — declarative cross-origin resource sharing (@Cors.Defaults on endpoint classes) -->
+        <dependency>
+            <groupId>io.helidon.webserver</groupId>
+            <artifactId>helidon-webserver-cors</artifactId>
+        </dependency>
+        {{/corsEnabled}}
+
         {{#serveOpenApi}}
         <!-- OpenAPI — serves spec at /openapi from META-INF/openapi.yaml -->
         <dependency>
