@@ -55,6 +55,8 @@ public class HelidonSeDeclarativeCodegen extends AbstractJavaCodegen {
     static final String OPT_SERVE_BASE_PATH = "serveBasePath";
     static final String OPT_CORS_ENABLED = "corsEnabled";
     static final String OPT_FT_ENABLED = "ftEnabled";
+    static final String OPT_TRACING_ENABLED = "tracingEnabled";
+    static final String OPT_METRICS_ENABLED = "metricsEnabled";
 
     private String helidonVersion = "4.4.0-M2";
     private boolean generateClient = true;
@@ -63,6 +65,8 @@ public class HelidonSeDeclarativeCodegen extends AbstractJavaCodegen {
     private String serveBasePath = "";
     private boolean corsEnabled = false;
     private boolean ftEnabled = false;
+    private boolean tracingEnabled = false;
+    private boolean metricsEnabled = false;
 
     public HelidonSeDeclarativeCodegen() {
         super();
@@ -123,6 +127,12 @@ public class HelidonSeDeclarativeCodegen extends AbstractJavaCodegen {
         addOption(OPT_FT_ENABLED,
                 "Add @Ft.Retry to every generated REST client interface (enables automatic retries)",
                 String.valueOf(ftEnabled));
+        addOption(OPT_TRACING_ENABLED,
+                "Add @Tracing.Traced to every endpoint class (creates spans for all endpoint methods)",
+                String.valueOf(tracingEnabled));
+        addOption(OPT_METRICS_ENABLED,
+                "Add @Metrics.Timed to every endpoint method (records invocation timing)",
+                String.valueOf(metricsEnabled));
     }
 
     // -------------------------------------------------------------------------
@@ -178,6 +188,14 @@ public class HelidonSeDeclarativeCodegen extends AbstractJavaCodegen {
             ftEnabled = Boolean.parseBoolean(
                     additionalProperties.get(OPT_FT_ENABLED).toString());
         }
+        if (additionalProperties.containsKey(OPT_TRACING_ENABLED)) {
+            tracingEnabled = Boolean.parseBoolean(
+                    additionalProperties.get(OPT_TRACING_ENABLED).toString());
+        }
+        if (additionalProperties.containsKey(OPT_METRICS_ENABLED)) {
+            metricsEnabled = Boolean.parseBoolean(
+                    additionalProperties.get(OPT_METRICS_ENABLED).toString());
+        }
 
         // Expose options to all templates via additionalProperties
         additionalProperties.put("helidonVersion", helidonVersion);
@@ -187,6 +205,8 @@ public class HelidonSeDeclarativeCodegen extends AbstractJavaCodegen {
         additionalProperties.put("serveBasePath", serveBasePath);
         additionalProperties.put("corsEnabled", corsEnabled);
         additionalProperties.put("ftEnabled", ftEnabled);
+        additionalProperties.put("tracingEnabled", tracingEnabled);
+        additionalProperties.put("metricsEnabled", metricsEnabled);
 
         // Conditionally add per-tag template files
         if (generateClient) {

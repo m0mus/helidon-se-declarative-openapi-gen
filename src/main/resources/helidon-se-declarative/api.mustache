@@ -9,6 +9,12 @@ import io.helidon.webserver.http.RestServer;
 {{#corsEnabled}}
 import io.helidon.webserver.cors.Cors;
 {{/corsEnabled}}
+{{#tracingEnabled}}
+import io.helidon.tracing.Tracing;
+{{/tracingEnabled}}
+{{#metricsEnabled}}
+import io.helidon.metrics.api.Metrics;
+{{/metricsEnabled}}
 {{#imports}}
 import {{import}};
 {{/imports}}
@@ -36,7 +42,8 @@ import io.helidon.security.abac.role.RoleValidator;
 @Service.Singleton
 @Http.Path("{{helidonBasePath}}")
 {{#corsEnabled}}@Cors.Defaults
-{{/corsEnabled}}public class {{classname}}Endpoint {
+{{/corsEnabled}}{{#tracingEnabled}}@Tracing.Traced
+{{/tracingEnabled}}public class {{classname}}Endpoint {
 
 {{#operation}}
     // -------------------------------------------------------------------------
@@ -51,7 +58,8 @@ import io.helidon.security.abac.role.RoleValidator;
     {{/vendorExtensions.x-status-code}}{{#vendorExtensions.x-has-security-roles}}@RoleValidator.Roles({{{vendorExtensions.x-roles-annotation-value}}})
     {{/vendorExtensions.x-has-security-roles}}{{#vendorExtensions.x-static-headers}}@RestServer.Header(name = "{{name}}", value = "{{value}}")
     {{/vendorExtensions.x-static-headers}}{{#vendorExtensions.x-computed-headers}}@RestServer.ComputedHeader(name = "{{name}}", function = "{{functionName}}")
-    {{/vendorExtensions.x-computed-headers}}public {{{returnType}}} {{operationId}}({{#allParams}}{{#isPathParam}}@Http.PathParam("{{baseName}}") {{{dataType}}} {{paramName}}{{/isPathParam}}{{#isQueryParam}}@Http.QueryParam("{{baseName}}") {{{dataType}}} {{paramName}}{{/isQueryParam}}{{#isHeaderParam}}@Http.HeaderParam("{{baseName}}") {{{dataType}}} {{paramName}}{{/isHeaderParam}}{{#isBodyParam}}@Http.Entity {{{dataType}}} {{paramName}}{{/isBodyParam}}{{^-last}}, {{/-last}}{{/allParams}}{{#vendorExtensions.x-has-security-roles}}{{#vendorExtensions.x-needs-leading-comma-for-security}}, {{/vendorExtensions.x-needs-leading-comma-for-security}}SecurityContext securityContext{{/vendorExtensions.x-has-security-roles}}) {
+    {{/vendorExtensions.x-computed-headers}}{{#metricsEnabled}}@Metrics.Timed
+    {{/metricsEnabled}}public {{{returnType}}} {{operationId}}({{#allParams}}{{#isPathParam}}@Http.PathParam("{{baseName}}") {{{dataType}}} {{paramName}}{{/isPathParam}}{{#isQueryParam}}@Http.QueryParam("{{baseName}}") {{{dataType}}} {{paramName}}{{/isQueryParam}}{{#isHeaderParam}}@Http.HeaderParam("{{baseName}}") {{{dataType}}} {{paramName}}{{/isHeaderParam}}{{#isBodyParam}}@Http.Entity {{{dataType}}} {{paramName}}{{/isBodyParam}}{{^-last}}, {{/-last}}{{/allParams}}{{#vendorExtensions.x-has-security-roles}}{{#vendorExtensions.x-needs-leading-comma-for-security}}, {{/vendorExtensions.x-needs-leading-comma-for-security}}SecurityContext securityContext{{/vendorExtensions.x-has-security-roles}}) {
         // TODO: implement {{operationId}}
         throw new UnsupportedOperationException("{{operationId}} not yet implemented");
     }
