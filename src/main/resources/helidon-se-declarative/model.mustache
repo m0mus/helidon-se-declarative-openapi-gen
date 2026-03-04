@@ -11,13 +11,15 @@ import {{import}};
  * {{description}}{{^description}}{{classname}} model.{{/description}}
  */
 @Json.Entity
-{{#vendorExtensions.x-has-validations}}@Validation.Validated
+{{#isDeprecated}}@Deprecated
+{{/isDeprecated}}{{#vendorExtensions.x-has-validations}}@Validation.Validated
 {{/vendorExtensions.x-has-validations}}public class {{classname}} {
 
 {{#vars}}
-    {{#vendorExtensions.x-validation-annotations}}{{{annotation}}}
+    {{#description}}/** {{description}} */
+    {{/description}}{{#vendorExtensions.x-validation-annotations}}{{{annotation}}}
     {{/vendorExtensions.x-validation-annotations}}{{#vendorExtensions.x-json-required}}@Json.Required
-    {{/vendorExtensions.x-json-required}}private {{{datatypeWithEnum}}} {{name}};
+    {{/vendorExtensions.x-json-required}}private {{{datatypeWithEnum}}} {{name}}{{#vendorExtensions.x-default-value}} = {{{vendorExtensions.x-default-value}}}{{/vendorExtensions.x-default-value}};
 
 {{/vars}}
     /** No-arg constructor. */
@@ -34,6 +36,13 @@ import {{import}};
     }
 
 {{/vars}}
+{{#vars}}{{#isEnum}}
+    public enum {{datatypeWithEnum}} {
+        {{#allowableValues}}{{#enumVars}}{{name}}{{^-last}},
+        {{/-last}}{{/enumVars}};{{/allowableValues}}
+    }
+
+{{/isEnum}}{{/vars}}
 }
 {{/model}}
 {{/models}}

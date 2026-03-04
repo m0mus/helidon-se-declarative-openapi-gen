@@ -23,6 +23,9 @@ import java.util.List;
 {{#hasOptionalQueryParams}}
 import java.util.Optional;
 {{/hasOptionalQueryParams}}
+{{#hasParamValidation}}
+import io.helidon.validation.Validation;
+{{/hasParamValidation}}
 {{#hasSecurityRoles}}
 import io.helidon.security.SecurityContext;
 import io.helidon.security.abac.role.RoleValidator;
@@ -50,7 +53,12 @@ import io.helidon.security.abac.role.RoleValidator;
     // {{httpMethod}} {{path}}
     // -------------------------------------------------------------------------
 
-    {{vendorExtensions.x-http-annotation}}
+    /**
+     * {{summary}}{{^summary}}{{operationId}}{{/summary}}.{{#notes}}
+     * <p>{{notes}}</p>
+     {{/notes}} */
+    {{#isDeprecated}}@Deprecated
+    {{/isDeprecated}}{{vendorExtensions.x-http-annotation}}
     {{#vendorExtensions.x-has-method-path}}@Http.Path("{{vendorExtensions.x-method-path}}")
     {{/vendorExtensions.x-has-method-path}}{{#hasProduces}}@Http.Produces(MediaTypes.APPLICATION_JSON_VALUE)
     {{/hasProduces}}{{#hasConsumes}}@Http.Consumes(MediaTypes.APPLICATION_JSON_VALUE)
@@ -59,7 +67,7 @@ import io.helidon.security.abac.role.RoleValidator;
     {{/vendorExtensions.x-has-security-roles}}{{#vendorExtensions.x-static-headers}}@RestServer.Header(name = "{{name}}", value = "{{value}}")
     {{/vendorExtensions.x-static-headers}}{{#vendorExtensions.x-computed-headers}}@RestServer.ComputedHeader(name = "{{name}}", function = "{{functionName}}")
     {{/vendorExtensions.x-computed-headers}}{{#metricsEnabled}}@Metrics.Timed
-    {{/metricsEnabled}}public {{{returnType}}} {{operationId}}({{#allParams}}{{#isPathParam}}@Http.PathParam("{{baseName}}") {{{dataType}}} {{paramName}}{{/isPathParam}}{{#isQueryParam}}@Http.QueryParam("{{baseName}}") {{{dataType}}} {{paramName}}{{/isQueryParam}}{{#isHeaderParam}}@Http.HeaderParam("{{baseName}}") {{{dataType}}} {{paramName}}{{/isHeaderParam}}{{#isBodyParam}}@Http.Entity {{{dataType}}} {{paramName}}{{/isBodyParam}}{{^-last}}, {{/-last}}{{/allParams}}{{#vendorExtensions.x-has-security-roles}}{{#vendorExtensions.x-needs-leading-comma-for-security}}, {{/vendorExtensions.x-needs-leading-comma-for-security}}SecurityContext securityContext{{/vendorExtensions.x-has-security-roles}}) {
+    {{/metricsEnabled}}public {{{returnType}}} {{operationId}}({{#allParams}}{{#isPathParam}}{{#vendorExtensions.x-validation-annotations}}{{{annotation}}} {{/vendorExtensions.x-validation-annotations}}@Http.PathParam("{{baseName}}") {{{dataType}}} {{paramName}}{{/isPathParam}}{{#isQueryParam}}{{#vendorExtensions.x-validation-annotations}}{{{annotation}}} {{/vendorExtensions.x-validation-annotations}}@Http.QueryParam("{{baseName}}") {{{dataType}}} {{paramName}}{{/isQueryParam}}{{#isHeaderParam}}{{#vendorExtensions.x-validation-annotations}}{{{annotation}}} {{/vendorExtensions.x-validation-annotations}}@Http.HeaderParam("{{baseName}}") {{{dataType}}} {{paramName}}{{/isHeaderParam}}{{#isBodyParam}}@Http.Entity {{{dataType}}} {{paramName}}{{/isBodyParam}}{{^-last}}, {{/-last}}{{/allParams}}{{#vendorExtensions.x-has-security-roles}}{{#vendorExtensions.x-needs-leading-comma-for-security}}, {{/vendorExtensions.x-needs-leading-comma-for-security}}SecurityContext securityContext{{/vendorExtensions.x-has-security-roles}}) {
         // TODO: implement {{operationId}}
         throw new UnsupportedOperationException("{{operationId}} not yet implemented");
     }

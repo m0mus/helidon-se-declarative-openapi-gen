@@ -11,6 +11,9 @@ import java.util.List;
 {{#hasOptionalQueryParams}}
 import java.util.Optional;
 {{/hasOptionalQueryParams}}
+{{#hasParamValidation}}
+import io.helidon.validation.Validation;
+{{/hasParamValidation}}
 {{#hasSecurityRoles}}
 import io.helidon.security.abac.role.RoleValidator;
 {{/hasSecurityRoles}}
@@ -26,14 +29,19 @@ import io.helidon.security.abac.role.RoleValidator;
 public interface {{classname}}Api {
 
 {{#operation}}
-    // {{operationId}} — {{httpMethod}} {{path}}
+    /**
+     * {{summary}}{{^summary}}{{operationId}}{{/summary}}.{{#notes}}
+     * <p>{{notes}}</p>
+     {{/notes}} */
+    {{#isDeprecated}}@Deprecated
+    {{/isDeprecated}}// {{operationId}} — {{httpMethod}} {{path}}
     {{vendorExtensions.x-http-annotation}}
     {{#vendorExtensions.x-has-method-path}}@Http.Path("{{vendorExtensions.x-method-path}}")
     {{/vendorExtensions.x-has-method-path}}{{#hasProduces}}@Http.Produces(MediaTypes.APPLICATION_JSON_VALUE)
     {{/hasProduces}}{{#hasConsumes}}@Http.Consumes(MediaTypes.APPLICATION_JSON_VALUE)
     {{/hasConsumes}}{{#vendorExtensions.x-status-code}}@RestServer.Status({{vendorExtensions.x-status-code}})
     {{/vendorExtensions.x-status-code}}{{#vendorExtensions.x-has-security-roles}}@RoleValidator.Roles({{{vendorExtensions.x-roles-annotation-value}}})
-    {{/vendorExtensions.x-has-security-roles}}{{{returnType}}} {{operationId}}({{#allParams}}{{#isPathParam}}@Http.PathParam("{{baseName}}") {{{dataType}}} {{paramName}}{{/isPathParam}}{{#isQueryParam}}@Http.QueryParam("{{baseName}}") {{{dataType}}} {{paramName}}{{/isQueryParam}}{{#isHeaderParam}}@Http.HeaderParam("{{baseName}}") {{{dataType}}} {{paramName}}{{/isHeaderParam}}{{#isBodyParam}}@Http.Entity {{{dataType}}} {{paramName}}{{/isBodyParam}}{{^-last}}, {{/-last}}{{/allParams}});
+    {{/vendorExtensions.x-has-security-roles}}{{{returnType}}} {{operationId}}({{#allParams}}{{#isPathParam}}{{#vendorExtensions.x-validation-annotations}}{{{annotation}}} {{/vendorExtensions.x-validation-annotations}}@Http.PathParam("{{baseName}}") {{{dataType}}} {{paramName}}{{/isPathParam}}{{#isQueryParam}}{{#vendorExtensions.x-validation-annotations}}{{{annotation}}} {{/vendorExtensions.x-validation-annotations}}@Http.QueryParam("{{baseName}}") {{{dataType}}} {{paramName}}{{/isQueryParam}}{{#isHeaderParam}}{{#vendorExtensions.x-validation-annotations}}{{{annotation}}} {{/vendorExtensions.x-validation-annotations}}@Http.HeaderParam("{{baseName}}") {{{dataType}}} {{paramName}}{{/isHeaderParam}}{{#isBodyParam}}@Http.Entity {{{dataType}}} {{paramName}}{{/isBodyParam}}{{^-last}}, {{/-last}}{{/allParams}});
 
 {{/operation}}
 }

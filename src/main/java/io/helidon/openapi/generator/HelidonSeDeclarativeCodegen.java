@@ -300,6 +300,7 @@ public class HelidonSeDeclarativeCodegen extends AbstractJavaCodegen {
         model.imports.remove("Schema");   // also remove OpenAPI 3 schema annotation shorthand
         model.imports.remove("JsonInclude");
         model.imports.remove("JsonProperty");
+        model.imports.remove("JsonNullable");   // openApiNullable wrapper — not used in our template
         return model;
     }
 
@@ -420,6 +421,7 @@ public class HelidonSeDeclarativeCodegen extends AbstractJavaCodegen {
         boolean anyComputedHeaders = false;
         boolean anyOptionalQuery = false;
         boolean anySecurityRoles = false;
+        boolean anyParamValidation = false;
         String errorModel = null;
 
         for (CodegenOperation op : opList) {
@@ -447,6 +449,14 @@ public class HelidonSeDeclarativeCodegen extends AbstractJavaCodegen {
             if (op.allParams.stream().anyMatch(p -> p.vendorExtensions.containsKey("x-optional"))) {
                 anyOptionalQuery = true;
             }
+            // Parameter-level validation annotations
+            for (CodegenParameter param : op.allParams) {
+                List<Map<String, Object>> paramValidations = buildParamValidationAnnotations(param);
+                if (!paramValidations.isEmpty()) {
+                    param.vendorExtensions.put("x-validation-annotations", paramValidations);
+                    anyParamValidation = true;
+                }
+            }
             if (op.vendorExtensions.containsKey("x-has-security-roles")) {
                 anySecurityRoles = true;
                 // SecurityContext needs a leading comma when other params already appear
@@ -468,6 +478,7 @@ public class HelidonSeDeclarativeCodegen extends AbstractJavaCodegen {
         result.put("hasComputedHeaders", anyComputedHeaders);
         result.put("hasOptionalQueryParams", anyOptionalQuery);
         result.put("hasSecurityRoles", anySecurityRoles);
+        result.put("hasParamValidation", anyParamValidation);
         result.put("errorModel", errorModel != null ? errorModel : "Object");
         if (anySecurityRoles) {
             // Visible to supporting-file templates (pom.xml, application.yaml) which only
@@ -545,6 +556,12 @@ public class HelidonSeDeclarativeCodegen extends AbstractJavaCodegen {
                     if (!validationAnnotations.isEmpty()) {
                         prop.vendorExtensions.put("x-validation-annotations", validationAnnotations);
                         modelHasValidation = true;
+                    }
+
+                    // Format default value as a Java literal for field initializer
+                    String javaDefault = formatDefaultValue(prop);
+                    if (javaDefault != null) {
+                        prop.vendorExtensions.put("x-default-value", javaDefault);
                     }
                 }
 
@@ -648,6 +665,100 @@ public class HelidonSeDeclarativeCodegen extends AbstractJavaCodegen {
             List<String> attrs = new ArrayList<>();
             if (prop.minItems != null) attrs.add("min = " + prop.minItems);
             if (prop.maxItems != null) attrs.add("value = " + prop.maxItems);
+            result.add(Map.of("annotation",
+                    "@Validation.Collection.Size(" + String.join(", ", attrs) + ")"));
+        }
+
+        return result;
+    }
+
+    /**
+     * Formats a property's default value as a Java literal for use in a field initializer.
+     * Returns {@code null} when no useful initializer can be produced (e.g. arrays).
+     */
+    private String formatDefaultValue(CodegenProperty prop) {
+        if (prop.defaultValue == null || prop.defaultValue.isEmpty()) {
+            return null;
+        }
+        String val = prop.defaultValue;
+        if (prop.isEnum) {
+            // Upstream AbstractJavaCodegen already formats the default as "TypeName.CONSTANT"
+            return val;
+        }
+        if (prop.isString) {
+            // Escape backslashes and double-quotes, then wrap in quotes
+            return "\"" + val.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
+        }
+        if (prop.isLong) {
+            return val + "L";
+        }
+        if (prop.isFloat) {
+            return val + "f";
+        }
+        if (prop.isArray || prop.isMap) {
+            return null;  // skip — complex initialization
+        }
+        return val;  // integer, double, boolean — value as-is
+    }
+
+    /**
+     * Maps OpenAPI schema constraints on a parameter to Helidon {@code @Validation.*} annotations.
+     * Mirrors {@link #buildValidationAnnotations(CodegenProperty)} but operates on {@link CodegenParameter}.
+     */
+    private List<Map<String, Object>> buildParamValidationAnnotations(CodegenParameter param) {
+        List<Map<String, Object>> result = new ArrayList<>();
+
+        if (param.isString) {
+            if (param.minLength != null || param.maxLength != null) {
+                List<String> attrs = new ArrayList<>();
+                if (param.minLength != null) attrs.add("min = " + param.minLength);
+                if (param.maxLength != null) attrs.add("value = " + param.maxLength);
+                result.add(Map.of("annotation",
+                        "@Validation.String.Length(" + String.join(", ", attrs) + ")"));
+            }
+            if (param.pattern != null && !param.pattern.isEmpty()) {
+                String escaped = param.pattern.replace("\\", "\\\\").replace("\"", "\\\"");
+                result.add(Map.of("annotation", "@Validation.String.Pattern(\"" + escaped + "\")"));
+            }
+        } else if (param.isInteger) {
+            if (param.minimum != null) {
+                try {
+                    result.add(Map.of("annotation",
+                            "@Validation.Integer.Min(" + (int) Double.parseDouble(param.minimum) + ")"));
+                } catch (NumberFormatException ignored) { }
+            }
+            if (param.maximum != null) {
+                try {
+                    result.add(Map.of("annotation",
+                            "@Validation.Integer.Max(" + (int) Double.parseDouble(param.maximum) + ")"));
+                } catch (NumberFormatException ignored) { }
+            }
+        } else if (param.isLong) {
+            if (param.minimum != null) {
+                try {
+                    result.add(Map.of("annotation",
+                            "@Validation.Long.Min(" + (long) Double.parseDouble(param.minimum) + "L)"));
+                } catch (NumberFormatException ignored) { }
+            }
+            if (param.maximum != null) {
+                try {
+                    result.add(Map.of("annotation",
+                            "@Validation.Long.Max(" + (long) Double.parseDouble(param.maximum) + "L)"));
+                } catch (NumberFormatException ignored) { }
+            }
+        } else if (param.isNumber || param.isFloat || param.isDouble) {
+            if (param.minimum != null) {
+                result.add(Map.of("annotation", "@Validation.Number.Min(\"" + param.minimum + "\")"));
+            }
+            if (param.maximum != null) {
+                result.add(Map.of("annotation", "@Validation.Number.Max(\"" + param.maximum + "\")"));
+            }
+        }
+
+        if (param.isArray && (param.minItems != null || param.maxItems != null)) {
+            List<String> attrs = new ArrayList<>();
+            if (param.minItems != null) attrs.add("min = " + param.minItems);
+            if (param.maxItems != null) attrs.add("value = " + param.maxItems);
             result.add(Map.of("annotation",
                     "@Validation.Collection.Size(" + String.join(", ", attrs) + ")"));
         }
