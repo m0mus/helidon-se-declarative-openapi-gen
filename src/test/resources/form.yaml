@@ -1,0 +1,46 @@
+openapi: "3.0.0"
+info:
+  title: Form Test API
+  version: "1.0"
+paths:
+  /submit:
+    post:
+      summary: Submit a form
+      operationId: submitForm
+      tags:
+        - forms
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                email:
+                  type: string
+      responses:
+        "200":
+          description: OK
+  /upload:
+    post:
+      summary: Upload a file
+      operationId: uploadFile
+      tags:
+        - forms
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                name:
+                  type: string
+      responses:
+        "201":
+          description: Created

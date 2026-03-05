@@ -318,6 +318,44 @@ public class HelidonSeDeclarativeCodegen extends AbstractJavaCodegen {
         // HTTP method annotation string (e.g. "@Http.GET")
         op.vendorExtensions.put("x-http-annotation", "@Http." + httpMethod.toUpperCase());
 
+        // Determine the @Http.Consumes media type constant for this operation
+        if (op.hasConsumes && op.consumes != null && !op.consumes.isEmpty()) {
+            String mediaType = op.consumes.get(0).get("mediaType");
+            if ("multipart/form-data".equals(mediaType)) {
+                op.vendorExtensions.put("x-consumes-value", "MediaTypes.MULTIPART_FORM_DATA_VALUE");
+                op.vendorExtensions.put("x-is-multipart", Boolean.TRUE);
+            } else if ("application/x-www-form-urlencoded".equals(mediaType)) {
+                op.vendorExtensions.put("x-consumes-value", "MediaTypes.APPLICATION_FORM_URLENCODED_VALUE");
+                op.vendorExtensions.put("x-is-form-urlencoded", Boolean.TRUE);
+            } else {
+                op.vendorExtensions.put("x-consumes-value", "MediaTypes.APPLICATION_JSON_VALUE");
+            }
+        } else {
+            op.vendorExtensions.put("x-consumes-value", "MediaTypes.APPLICATION_JSON_VALUE");
+        }
+
+        // Collapse form params into a single typed body parameter (Helidon has no @Http.FormParam)
+        if (op.formParams != null && !op.formParams.isEmpty()) {
+            boolean isMultipart = op.vendorExtensions.containsKey("x-is-multipart");
+            String formParamNames = op.formParams.stream()
+                    .map(p -> p.paramName)
+                    .collect(Collectors.joining(", "));
+            op.vendorExtensions.put("x-form-param-names", formParamNames);
+
+            CodegenParameter synthetic = new CodegenParameter();
+            synthetic.paramName = "formBody";
+            synthetic.dataType = isMultipart ? "ReadableEntity" : "Parameters";
+            synthetic.isBodyParam = true;
+            synthetic.required = true;
+
+            List<CodegenParameter> nonFormParams = new ArrayList<>(
+                    op.allParams.stream().filter(p -> !p.isFormParam).collect(Collectors.toList()));
+            nonFormParams.add(synthetic);
+            op.allParams = nonFormParams;
+            op.bodyParam = synthetic;
+            op.formParams.clear();
+        }
+
         // Mark optional query parameters so the template can wrap them in Optional<>
         for (CodegenParameter param : op.allParams) {
             if (param.isQueryParam && !param.required) {
@@ -422,6 +460,8 @@ public class HelidonSeDeclarativeCodegen extends AbstractJavaCodegen {
         boolean anyOptionalQuery = false;
         boolean anySecurityRoles = false;
         boolean anyParamValidation = false;
+        boolean anyFormOperations = false;
+        boolean anyMultipartOperations = false;
         String errorModel = null;
 
         for (CodegenOperation op : opList) {
@@ -457,6 +497,9 @@ public class HelidonSeDeclarativeCodegen extends AbstractJavaCodegen {
                     anyParamValidation = true;
                 }
             }
+            if (op.vendorExtensions.containsKey("x-is-form-urlencoded")) anyFormOperations = true;
+            if (op.vendorExtensions.containsKey("x-is-multipart")) anyMultipartOperations = true;
+
             if (op.vendorExtensions.containsKey("x-has-security-roles")) {
                 anySecurityRoles = true;
                 // SecurityContext needs a leading comma when other params already appear
@@ -479,6 +522,8 @@ public class HelidonSeDeclarativeCodegen extends AbstractJavaCodegen {
         result.put("hasOptionalQueryParams", anyOptionalQuery);
         result.put("hasSecurityRoles", anySecurityRoles);
         result.put("hasParamValidation", anyParamValidation);
+        result.put("hasFormOperations", anyFormOperations);
+        result.put("hasMultipartOperations", anyMultipartOperations);
         result.put("errorModel", errorModel != null ? errorModel : "Object");
         if (anySecurityRoles) {
             // Visible to supporting-file templates (pom.xml, application.yaml) which only

@@ -14,6 +14,12 @@ import java.util.Optional;
 {{#hasParamValidation}}
 import io.helidon.validation.Validation;
 {{/hasParamValidation}}
+{{#hasFormOperations}}
+import io.helidon.http.Parameters;
+{{/hasFormOperations}}
+{{#hasMultipartOperations}}
+import io.helidon.http.media.ReadableEntity;
+{{/hasMultipartOperations}}
 {{#hasSecurityRoles}}
 import io.helidon.security.abac.role.RoleValidator;
 {{/hasSecurityRoles}}
@@ -38,7 +44,7 @@ public interface {{classname}}Api {
     {{vendorExtensions.x-http-annotation}}
     {{#vendorExtensions.x-has-method-path}}@Http.Path("{{vendorExtensions.x-method-path}}")
     {{/vendorExtensions.x-has-method-path}}{{#hasProduces}}@Http.Produces(MediaTypes.APPLICATION_JSON_VALUE)
-    {{/hasProduces}}{{#hasConsumes}}@Http.Consumes(MediaTypes.APPLICATION_JSON_VALUE)
+    {{/hasProduces}}{{#hasConsumes}}@Http.Consumes({{{vendorExtensions.x-consumes-value}}})
     {{/hasConsumes}}{{#vendorExtensions.x-status-code}}@RestServer.Status({{vendorExtensions.x-status-code}})
     {{/vendorExtensions.x-status-code}}{{#vendorExtensions.x-has-security-roles}}@RoleValidator.Roles({{{vendorExtensions.x-roles-annotation-value}}})
     {{/vendorExtensions.x-has-security-roles}}{{{returnType}}} {{operationId}}({{#allParams}}{{#isPathParam}}{{#vendorExtensions.x-validation-annotations}}{{{annotation}}} {{/vendorExtensions.x-validation-annotations}}@Http.PathParam("{{baseName}}") {{{dataType}}} {{paramName}}{{/isPathParam}}{{#isQueryParam}}{{#vendorExtensions.x-validation-annotations}}{{{annotation}}} {{/vendorExtensions.x-validation-annotations}}@Http.QueryParam("{{baseName}}") {{{dataType}}} {{paramName}}{{/isQueryParam}}{{#isHeaderParam}}{{#vendorExtensions.x-validation-annotations}}{{{annotation}}} {{/vendorExtensions.x-validation-annotations}}@Http.HeaderParam("{{baseName}}") {{{dataType}}} {{paramName}}{{/isHeaderParam}}{{#isBodyParam}}@Http.Entity {{{dataType}}} {{paramName}}{{/isBodyParam}}{{^-last}}, {{/-last}}{{/allParams}});
