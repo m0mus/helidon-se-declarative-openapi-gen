@@ -17,7 +17,7 @@ until the API stabilises.
 |------|---------|
 | Java | 21+ |
 | Maven | 3.9+ |
-| Helidon | 4.4.0-M1 (default; configurable) |
+| Helidon | 4.4.0-M2 (default; configurable) |
 
 ---
 
@@ -50,7 +50,7 @@ repository, where the openapi-generator Maven plugin can find it as a plugin dep
                 <inputSpec>${project.basedir}/src/main/resources/openapi.yaml</inputSpec>
                 <output>${project.build.directory}/generated-sources/openapi</output>
                 <configOptions>
-                    <helidonVersion>4.4.0-M1</helidonVersion>
+                    <helidonVersion>4.4.0-M2</helidonVersion>
                     <apiPackage>com.example.api</apiPackage>
                     <modelPackage>com.example.model</modelPackage>
                     <invokerPackage>com.example</invokerPackage>
@@ -91,14 +91,18 @@ Set options under `<configOptions>` in the plugin configuration.
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `helidonVersion` | `4.4.0-M1` | Helidon version written into the generated `pom.xml` |
+| `helidonVersion` | `4.4.0-M2` | Helidon version written into the generated `pom.xml` |
 | `apiPackage` | `io.helidon.example.api` | Package for endpoint, client, and exception classes |
-| `modelPackage` | `io.helidon.example.model` | Package for Jackson POJO model classes |
+| `modelPackage` | `io.helidon.example.model` | Package for model POJO classes |
 | `invokerPackage` | `io.helidon.example` | Package for `Main.java` |
 | `generateClient` | `true` | Emit a `{Tag}Client.java` REST client stub per tag |
 | `generateErrorHandler` | `true` | Emit `{Tag}Exception.java` + `{Tag}ErrorHandler.java` per tag |
 | `serveOpenApi` | `true` | Add `helidon-openapi` dependency (serves spec at `/openapi`) |
 | `serveBasePath` | *(from spec)* | Base path prefix prepended to all endpoint paths |
+| `corsEnabled` | `false` | Add `@Cors.Defaults` to every endpoint class and `helidon-webserver-cors` dependency |
+| `ftEnabled` | `false` | Add `@Ft.Retry` to every REST client interface and `helidon-fault-tolerance` dependency |
+| `tracingEnabled` | `false` | Add `@Tracing.Traced` to every endpoint class and `helidon-tracing` dependency |
+| `metricsEnabled` | `false` | Add `@Metrics.Timed` to every endpoint method and `helidon-metrics-api` dependency |
 
 ---
 
@@ -118,7 +122,7 @@ For each OpenAPI **schema** (excluding array aliases):
 
 | File | Description |
 |------|-------------|
-| `{Model}.java` | Jackson POJO with `@JsonInclude(NON_NULL)` and `@JsonProperty(required=true)` on required fields |
+| `{Model}.java` | Helidon build-time JSON binding POJO with `@Json.Entity`; `@Json.Required` on required fields; inner enum types; field initialisers for defaults |
 
 Supporting files (one per project):
 
@@ -142,7 +146,11 @@ Supporting files (one per project):
 | Per-operation remainder path (e.g. `/{id}`) | `@Http.Path("/{id}")` on the method |
 | `produces: application/json` | `@Http.Produces(MediaTypes.APPLICATION_JSON_VALUE)` |
 | `consumes: application/json` | `@Http.Consumes(MediaTypes.APPLICATION_JSON_VALUE)` |
+| `consumes: application/x-www-form-urlencoded` | `@Http.Consumes(MediaTypes.APPLICATION_FORM_URLENCODED_VALUE)` + `@Http.Entity Parameters formBody` |
+| `consumes: multipart/form-data` | `@Http.Consumes(MediaTypes.MULTIPART_FORM_DATA_VALUE)` + `@Http.Entity ReadableEntity formBody` |
 | Non-200 success status (e.g. `201`) | `@RestServer.Status(201)` |
+| `deprecated: true` | `@Deprecated` on the method |
+| `summary` / `description` | Javadoc comment on the method |
 
 ### Parameters
 
@@ -152,27 +160,48 @@ Supporting files (one per project):
 | `query` (required) | `@Http.QueryParam("name") Type name` |
 | `query` (optional) | `@Http.QueryParam("name") Optional<Type> name` |
 | `header` | `@Http.HeaderParam("Name") Type name` |
-| `requestBody` | `@Http.Entity Type body` + `@Http.Consumes` on method |
+| `requestBody` (JSON) | `@Http.Entity Type body` + `@Http.Consumes` on method |
+
+### Parameter validation
+
+OpenAPI schema constraints on parameters are mapped to Helidon `@Validation.*` annotations:
+
+| Constraint | Generated annotation |
+|------------|---------------------|
+| `minLength` / `maxLength` | `@Validation.String.Length(min = N, value = M)` |
+| `pattern` | `@Validation.String.Pattern("…")` |
+| `minimum` / `maximum` (integer) | `@Validation.Integer.Min(N)` / `@Validation.Integer.Max(N)` |
+| `minimum` / `maximum` (long) | `@Validation.Long.Min(NL)` / `@Validation.Long.Max(NL)` |
+| `minimum` / `maximum` (number) | `@Validation.Number.Min("N")` / `@Validation.Number.Max("N")` |
+| `minItems` / `maxItems` (array) | `@Validation.Collection.Size(min = N, value = M)` |
+
+The same mappings apply to model property constraints.
 
 ### Response headers
 
-When a success response declares headers, the generated endpoint method receives an
-injected `ServerResponse res` parameter and includes a comment showing the header to set:
+When a 2xx response declares headers, the generated endpoint method gets declarative
+header annotations rather than a `ServerResponse` parameter:
 
-```java
-public List<Item> listItems(ServerResponse res,
-                             @Http.QueryParam("limit") Optional<Integer> limit) {
-    // Example: res.header(HeaderNames.create("x-next"), "value");
-    throw new UnsupportedOperationException("listItems not yet implemented");
-}
-```
+- **Static value** (header schema has a `default`): `@RestServer.Header(name = "…", value = "…")`
+- **Dynamic value**: `@RestServer.ComputedHeader(name = "…", function = "…HeaderFn")`
 
 ### Security
 
-When an operation has `security` requirements, the scopes are extracted and stored as the
-vendor extension `x-security-roles` on the operation — ready to be mapped to
-`@RoleValidator.Roles` once you integrate a security provider. The generated
+Operations with `security` requirements emit `@RoleValidator.Roles` on the method and
+receive an injected `SecurityContext securityContext` parameter. The generated
 `application.yaml` includes a commented-out security provider stub as a starting point.
+
+### Models
+
+| OpenAPI schema feature | Generated Java |
+|------------------------|----------------|
+| `required` field | `@Json.Required` annotation |
+| `enum` values | Inner `public enum {Prop}Enum` class with constants |
+| `default` value | Field initialiser (e.g. `= StatusEnum.ACTIVE`, `= 0`, `= 1.0`) |
+| `nullable: true` | No special annotation needed (Helidon JSON binding omits nulls by default) |
+| `description` on property | Javadoc comment on the field |
+| `deprecated: true` on schema | `@Deprecated` on the class |
+| `description` on schema | Javadoc comment on the class |
 
 ### Model names
 
@@ -193,7 +222,7 @@ openapi-gen/
         ├── META-INF/services/
         │   └── org.openapitools.codegen.CodegenConfig   SPI registration
         └── helidon-se-declarative/                  Mustache templates
-            ├── model.mustache                       Jackson POJO
+            ├── model.mustache                       Helidon JSON binding POJO
             ├── api-interface.mustache               @Http.Path interface ({Tag}Api)
             ├── api.mustache                         @RestServer.Endpoint class ({Tag}Endpoint)
             ├── restClient.mustache                  @RestClient.Endpoint stub ({Tag}Client)
